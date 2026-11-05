@@ -4,7 +4,7 @@ import type { Card, CardInput, Deck, ExportBundle, Rating, ReviewLog, Settings }
 import { endOfToday, newCardSchedulingFields, schedule, startOfToday } from '@/lib/scheduler'
 import { uid } from '@/lib/utils'
 
-const DEFAULT_SETTINGS: Settings = {
+export const DEFAULT_SETTINGS: Settings = {
   id: 'app',
   theme: 'system',
   ttsEnabled: true,

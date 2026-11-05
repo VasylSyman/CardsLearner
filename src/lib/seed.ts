@@ -29,7 +29,7 @@ const SEED_CARDS: SeedCard[] = [
 let seedPromise: Promise<boolean> | null = null
 
 export function seedIfEmpty(): Promise<boolean> {
-  seedPromise ??= db.transaction('rw', db.decks, db.cards, db.settings, async () => {
+  seedPromise ??= db.transaction('rw', db.decks, db.cards, db.settings, db.outbox, async () => {
     if ((await db.decks.count()) > 0) return false
     const deck = await repo.createDeck({
       name: 'Spanish Essentials',

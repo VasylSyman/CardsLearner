@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Layers, GraduationCap, Table2, Settings, Sun, Moon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { SyncIndicator } from '@/components/SyncIndicator'
 import { useTheme } from '@/hooks/useTheme'
 import type { Route } from '@/hooks/useHashRoute'
 import { cn } from '@/lib/utils'
@@ -51,6 +52,7 @@ export function AppShell({ route, navigate, children }: AppShellProps) {
             )
           })}
         </nav>
+        <SyncIndicator />
         <Button variant="ghost" size="sm" onClick={toggle} className="justify-start gap-3 text-muted-foreground">
           {resolved === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
           {resolved === 'dark' ? 'Light mode' : 'Dark mode'}
@@ -64,9 +66,12 @@ export function AppShell({ route, navigate, children }: AppShellProps) {
           </span>
           <span className="font-semibold">Lingo Cards</span>
         </button>
-        <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">
-          {resolved === 'dark' ? <Sun className="size-5" /> : <Moon className="size-5" />}
-        </Button>
+        <div className="flex items-center gap-1">
+          <SyncIndicator compact />
+          <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">
+            {resolved === 'dark' ? <Sun className="size-5" /> : <Moon className="size-5" />}
+          </Button>
+        </div>
       </header>
 
       <main className={cn('flex min-h-0 flex-1 flex-col overflow-y-auto', !isStudy && 'pb-20 md:pb-0')}>

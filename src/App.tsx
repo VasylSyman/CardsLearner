@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AppShell } from '@/components/AppShell'
 import { useHashRoute } from '@/hooks/useHashRoute'
+import { isCloudConfigured } from '@/db'
+import { startSync } from '@/db/syncEngine'
 import { seedIfEmpty } from '@/lib/seed'
 import { DecksPage } from '@/features/decks/DecksPage'
 import { StudyPage } from '@/features/study/StudyPage'
@@ -13,12 +16,21 @@ export default function App() {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    seedIfEmpty().finally(() => setReady(true))
+    let cancelled = false
+    ;(async () => {
+      const pulled = await startSync().catch(() => false)
+      if (!isCloudConfigured || pulled) await seedIfEmpty().catch(console.error)
+      if (!cancelled) setReady(true)
+    })()
+    return () => { cancelled = true }
   }, [])
 
   if (!ready) {
     return (
-      <div className="flex h-full items-center justify-center text-muted-foreground">Loading…</div>
+      <div className="flex h-full items-center justify-center gap-2 text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" />
+        {isCloudConfigured ? 'Syncing with cloud...' : 'Loading...'}
+      </div>
     )
   }
 

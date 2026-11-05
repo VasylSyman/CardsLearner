@@ -1,7 +1,10 @@
 import { useRef, useState } from 'react'
-import { Download, Trash2, Upload, Volume2 } from 'lucide-react'
-import { repo } from '@/db'
+import { CloudDownload, CloudUpload, Download, RefreshCw, Trash2, Upload, Volume2 } from 'lucide-react'
+import { isCloudConfigured, repo } from '@/db'
 import type { ExportBundle } from '@/db'
+import { flush, getSyncStatus, pullFromCloud, pushAllLocal } from '@/db/syncEngine'
+import type { SyncPhase } from '@/db/syncEngine'
+import { useSyncStatus } from '@/hooks/useSyncStatus'
 import {
   CSV_HEADERS,
   exportCsv,
@@ -39,6 +42,8 @@ export function SettingsPage() {
   const { supported, speak, voices } = useSpeech()
 
   const [status, setStatus] = useState('')
+  const [busy, setBusy] = useState(false)
+  const { phase, lastSyncedAt, error, pending } = useSyncStatus()
   const jsonInputRef = useRef<HTMLInputElement>(null)
   const csvInputRef = useRef<HTMLInputElement>(null)
   const [importJson, setImportJson] = useState<ExportBundle | null>(null)
@@ -133,6 +138,52 @@ export function SettingsPage() {
     window.location.reload()
   }
 
+  const uploadAll = async () => {
+    if (!window.confirm('Upload every local deck, card and review to the cloud database? Existing cloud rows with the same id are overwritten.')) return
+    setBusy(true)
+    try {
+      const counts = await pushAllLocal()
+      setStatus(`Uploaded ${counts.decks} decks, ${counts.cards} cards, ${counts.logs} reviews.`)
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : 'Upload failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const pullAll = async () => {
+    setBusy(true)
+    try {
+      const ok = await pullFromCloud()
+      setStatus(ok ? 'Pulled latest data from the cloud.' : getSyncStatus().error ?? 'Pull failed.')
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : 'Pull failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const retryPending = async () => {
+    setBusy(true)
+    try {
+      await flush()
+      setStatus('Retried pending changes.')
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : 'Retry failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const phaseLabel: Record<SyncPhase, string> = {
+    local: 'Local only',
+    loading: 'Loading',
+    synced: 'Synced',
+    syncing: 'Syncing…',
+    offline: 'Offline',
+    error: 'Sync error',
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 p-4 sm:p-6">
       <header>
@@ -161,6 +212,51 @@ export function SettingsPage() {
               </SelectContent>
             </Select>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Cloud sync</CardTitle>
+          <CardDescription>Supabase keeps every device on the same vocabulary database.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!isCloudConfigured ? (
+            <p className="text-sm text-muted-foreground">
+              Not configured. Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> to{' '}
+              <code>.env.local</code> (see README) to sync across devices. Data is stored only in this browser.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                <span>{phaseLabel[phase]}</span>
+                {lastSyncedAt && (
+                  <span className="text-muted-foreground">
+                    · last synced {new Date(lastSyncedAt).toLocaleTimeString()}
+                  </span>
+                )}
+                {pending > 0 && (
+                  <span className="text-muted-foreground">
+                    · {pending} pending change{pending === 1 ? '' : 's'}
+                  </span>
+                )}
+              </div>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => void uploadAll()} disabled={busy}>
+                  <CloudUpload /> Sync local to cloud
+                </Button>
+                <Button variant="outline" onClick={() => void pullAll()} disabled={busy}>
+                  <CloudDownload /> Pull from cloud
+                </Button>
+                {pending > 0 && (
+                  <Button variant="outline" onClick={() => void retryPending()} disabled={busy}>
+                    <RefreshCw /> Retry pending
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -300,7 +396,8 @@ export function SettingsPage() {
             <Trash2 /> Delete all data
           </Button>
           <p className="mt-2 text-xs text-muted-foreground">
-            Wipes every deck, card and setting from this browser.
+            Wipes every deck, card and setting from this browser
+            {isCloudConfigured ? ' and from the cloud database.' : '.'}
           </p>
         </CardContent>
       </Card>
@@ -347,7 +444,9 @@ export function SettingsPage() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            Local-first. All data is stored in this browser (IndexedDB). Export regularly to back up.
+            {isCloudConfigured
+              ? 'Cloud-synced via Supabase with a local IndexedDB cache, so study works offline and syncs when you reconnect.'
+              : 'Local-first. All data is stored in this browser (IndexedDB). Export regularly to back up.'}
           </p>
         </CardContent>
       </Card>
