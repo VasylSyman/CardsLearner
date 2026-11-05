@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, repo } from '@/db'
+import { DEFAULT_SETTINGS } from '@/db/dexieRepository'
 import type { Card, Deck, Settings } from '@/db/types'
 import type { DueCounts } from '@/db/repository'
 
@@ -19,7 +20,10 @@ export function useCards(deckId?: string): Card[] | undefined {
 }
 
 export function useSettings(): Settings | undefined {
-  return useLiveQuery(() => repo.getSettings(), [])
+  return useLiveQuery(async () => {
+    const s = await db.settings.get('app')
+    return { ...DEFAULT_SETTINGS, ...s }
+  }, [])
 }
 
 export function useDueCounts(deckId?: string): DueCounts | undefined {
